@@ -3,295 +3,596 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AirSketch — Draw in the Air</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <title>Project Cam — Main Menu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&family=VT323&display=swap" />
+
+    <style>
+        /* =========================================================
+           Project Cam — Main Menu   🎃 SPOOKATHON EDITION 🎃
+           Nintendo DS–inspired launcher, Halloween repaint.
+
+           All colors live in the :root block below. Change those
+           values to swap themes without touching anything else.
+           ========================================================= */
+
+        :root {
+            /* ----- Halloween palette ----- */
+            --menu-bg-a: #2d1b4e;         /* top of the "screen" (deep plum) */
+            --menu-bg-b: #0a0415;         /* bottom of the "screen" (midnight) */
+            --menu-chrome: #1a0f26;       /* bezel (nearly black plum) */
+            --menu-chrome-hi: #3a1f52;    /* bezel highlight */
+
+            --menu-ink: #faf2d8;          /* bone-white screen text */
+            --menu-ink-dim: #c7b1dc;      /* dim lavender text */
+            --menu-paper: #faeccb;        /* tile face (jack-o-lantern paper) */
+            --menu-paper-hi: #fff8e0;     /* tile gloss */
+            --menu-line: #26122e;         /* tile hairline (deep plum) */
+            --menu-shadow: rgba(0, 0, 0, 0.55);
+            --tile-ink: #2a1130;          /* tile text */
+            --tile-ink-dim: #6b4c7b;      /* tile dim text */
+
+            --menu-accent: #ff7518;        /* pumpkin orange */
+            --menu-accent-glow: #ffb347;   /* soft candle glow */
+            --menu-ectoplasm: #9df28a;     /* ghostly green */
+
+            /* Per-tile tints */
+            --tile-scribbl-a: #ff7518;    /* pumpkin orange */
+            --tile-scribbl-b: #ffb347;    /* candle glow */
+            --tile-booth-a:   #8b5cf6;    /* witch purple */
+            --tile-booth-b:   #c084fc;    /* lilac */
+
+            /* Motion */
+            --t:        240ms cubic-bezier(.22, 1, .36, 1);
+            --t-spring: 420ms cubic-bezier(.34, 1.56, .64, 1);   /* overshoot bounce */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--menu-ink);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ---------- Outer "device shell" ---------- */
+        body {
+            min-height: 100vh;
+            padding: 32px;
+            background:
+                radial-gradient(ellipse at top, var(--menu-chrome-hi), var(--menu-chrome) 60%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        .device {
+            width: 100%;
+            max-width: 1040px;
+            background: var(--menu-chrome);
+            border-radius: 28px;
+            padding: 18px;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, .06),
+                inset 0 -2px 4px rgba(0, 0, 0, .45),
+                0 24px 60px -12px rgba(0, 0, 0, .75),
+                0 0 80px -20px rgba(255, 117, 24, .25);   /* faint orange glow */
+            position: relative;
+            animation: device-pop 700ms cubic-bezier(.34, 1.56, .64, 1) both;
+        }
+        @keyframes device-pop {
+            0%   { opacity: 0; transform: scale(.92); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Little screw-like dots in each corner of the bezel */
+        .device::before,
+        .device::after,
+        .screw-r,
+        .screw-l {
+            content: '';
+            position: absolute;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #6b4983, #1a0f26);
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,.5);
+        }
+        .device::before { top: 10px;  left: 10px; }
+        .device::after  { top: 10px;  right: 10px; }
+        .screw-l        { bottom: 10px; left: 10px; }
+        .screw-r        { bottom: 10px; right: 10px; }
+
+        /* ---------- The "screen" ---------- */
+        .screen {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse at 50% 110%, rgba(255,117,24,.18), transparent 55%),
+                linear-gradient(180deg, var(--menu-bg-a) 0%, var(--menu-bg-b) 100%);
+            box-shadow:
+                inset 0 0 0 2px rgba(0, 0, 0, .55),
+                inset 0 0 80px rgba(0, 0, 0, .35);
+            padding: 28px clamp(20px, 4vw, 44px);
+        }
+
+        /* Starfield behind the content */
+        .screen::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                radial-gradient(1.5px 1.5px at 12% 18%, rgba(255,255,255,.85), transparent 50%),
+                radial-gradient(1.2px 1.2px at 76% 12%, rgba(255,245,210,.75), transparent 50%),
+                radial-gradient(1.8px 1.8px at 32% 42%, rgba(255,255,255,.65), transparent 50%),
+                radial-gradient(1px   1px   at 58% 68%, rgba(255,255,255,.6),  transparent 50%),
+                radial-gradient(1.5px 1.5px at 88% 55%, rgba(255,245,210,.7),  transparent 50%),
+                radial-gradient(1px   1px   at 22% 82%, rgba(255,255,255,.5),  transparent 50%),
+                radial-gradient(1.2px 1.2px at 68% 32%, rgba(255,255,255,.65), transparent 50%),
+                radial-gradient(1px   1px   at 94% 90%, rgba(255,245,210,.6),  transparent 50%),
+                radial-gradient(1px   1px   at  5% 55%, rgba(255,255,255,.55), transparent 50%);
+            animation: twinkle 4s ease-in-out infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: .85; }
+            50%      { opacity: .45; }
+        }
+
+        /* Subtle CRT-ish scanlines over everything */
+        .screen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(255,255,255,.03) 0px,
+                rgba(255,255,255,.03) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            mix-blend-mode: overlay;
+            opacity: .35;
+        }
+
+        /* ---------- Floating haunts (ghosts, bats, pumpkins) ---------- */
+        .haunts {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+        .haunt {
+            position: absolute;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,.5));
+            opacity: .55;
+            will-change: transform;
+        }
+        .haunt-pumpkin-1 { top: 8%;  left: 4%;  font-size: 36px; animation: drift 7s ease-in-out  -0.4s infinite; }
+        .haunt-ghost     { top: 18%; right: 5%; font-size: 42px; animation: drift 8s ease-in-out  -1.2s infinite; opacity: .65; }
+        .haunt-bat-1     { top: 46%; left: 8%;  font-size: 28px; animation: drift 6s ease-in-out  -2.1s infinite; }
+        .haunt-bat-2     { bottom: 22%; right: 10%; font-size: 32px; animation: drift 9s ease-in-out -3.5s infinite; }
+        .haunt-web {
+            top: -8px; right: -12px; font-size: 90px;
+            opacity: .25; transform: rotate(32deg);
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,.4));
+        }
+        .haunt-pumpkin-2 { bottom: 8%; left: 14%; font-size: 24px; animation: drift 10s ease-in-out -0.8s infinite; opacity: .5; }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0)   rotate(-4deg); }
+            50%      { transform: translate(6px, -14px) rotate(4deg); }
+        }
+
+        /* ---------- Top status bar ---------- */
+        .status-bar {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 2px 20px;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            color: var(--menu-ink);
+            letter-spacing: 0.03em;
+        }
+        .status-left,
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 0 0 8px rgba(255,117,24,.4);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--menu-accent);
+            box-shadow: 0 0 10px var(--menu-accent), 0 0 20px var(--menu-accent-glow);
+            animation: blink 1.6s ease-in-out infinite;
+        }
+        @keyframes blink { 0%, 60% { opacity: 1; } 80%, 100% { opacity: .2; } }
+
+        /* ---------- Brand / title block ---------- */
+        .brand-block {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            padding: 10px 0 24px;
+        }
+        .brand {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-weight: 400;
+            font-size: clamp(44px, 7vw, 76px);
+            line-height: 1;
+            letter-spacing: -0.01em;
+            color: var(--menu-ink);
+            text-shadow:
+                0 2px 0 rgba(0,0,0,.4),
+                0 0 20px rgba(255,117,24,.45),
+                0 0 44px rgba(255,117,24,.25);
+            animation: pop-in .75s cubic-bezier(.34, 1.56, .64, 1) 180ms both;
+        }
+        .brand .brand-dot {
+            display: inline-block;
+            width: 16px; height: 16px;
+            margin: 0 10px 10px;
+            vertical-align: middle;
+            background: var(--menu-accent);
+            border-radius: 50%;
+            box-shadow:
+                0 2px 6px rgba(255,117,24,.6),
+                0 0 20px rgba(255,117,24,.5);
+            animation: throb 2.2s ease-in-out infinite;
+        }
+        @keyframes throb {
+            0%, 100% { transform: scale(1);   box-shadow: 0 2px 6px rgba(255,117,24,.6), 0 0 20px rgba(255,117,24,.5); }
+            50%      { transform: scale(1.2); box-shadow: 0 2px 10px rgba(255,117,24,.8), 0 0 32px rgba(255,117,24,.8); }
+        }
+
+        .subtitle {
+            margin-top: 10px;
+            font-family: 'Creepster', 'VT323', monospace;
+            font-size: 32px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--menu-accent-glow);
+            text-shadow:
+                0 2px 0 rgba(0,0,0,.4),
+                0 0 12px rgba(255,117,24,.6);
+            animation: pop-in .65s cubic-bezier(.34, 1.56, .64, 1) 360ms both;
+        }
+        .subtitle .bat {
+            display: inline-block;
+            margin: 0 14px;
+            font-size: 24px;
+            vertical-align: middle;
+            animation: wiggle 3s ease-in-out infinite;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
+        }
+        .subtitle .bat.right { animation-delay: -1.5s; }
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-10deg); }
+            50%      { transform: rotate(14deg); }
+        }
+
+        @keyframes pop-in {
+            0%   { opacity: 0; transform: scale(.4) translateY(14px); }
+            60%  { transform: scale(1.08) translateY(-4px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* ---------- Tile grid ---------- */
+        .tiles {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            padding: 12px 0 28px;
+            max-width: 920px;
+            margin: 0 auto;
+        }
+
+        .tile {
+            --a: var(--tile-scribbl-a);
+            --b: var(--tile-scribbl-b);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            aspect-ratio: 1 / 1.08;
+            padding: 20px 16px 18px;
+            border-radius: 18px;
+            background:
+                radial-gradient(ellipse at top, var(--menu-paper-hi) 0%, var(--menu-paper) 55%);
+            color: var(--tile-ink);
+            text-decoration: none;
+            box-shadow:
+                inset 0 0 0 2px var(--menu-line),
+                inset 0 -4px 0 rgba(0, 0, 0, .08),
+                0 6px 0 rgba(0, 0, 0, .35),
+                0 14px 24px -8px var(--menu-shadow),
+                0 0 24px -4px color-mix(in srgb, var(--a) 40%, transparent);  /* lantern glow */
+            transition:
+                transform var(--t-spring),
+                box-shadow var(--t);
+            overflow: hidden;
+            animation: tile-pop .8s cubic-bezier(.34, 1.56, .64, 1) both;
+            will-change: transform;
+        }
+        .tile:nth-child(1) { animation-delay: 520ms; }
+        .tile:nth-child(2) { animation-delay: 660ms; }
+        .tile:nth-child(3) { animation-delay: 800ms; }
+
+        @keyframes tile-pop {
+            0%   { opacity: 0; transform: scale(.35) translateY(40px) rotate(-6deg); }
+            55%  { opacity: 1; transform: scale(1.08) translateY(-6px) rotate(2deg); }
+            100% { opacity: 1; transform: scale(1) translateY(0) rotate(0); }
+        }
+
+        /* Big colored halo at the top of each tile */
+        .tile::before {
+            content: '';
+            position: absolute;
+            top: -40%;
+            left: -10%;
+            right: -10%;
+            height: 70%;
+            background: radial-gradient(ellipse at center bottom, var(--a), transparent 65%);
+            opacity: .28;
+            transition: opacity var(--t), top var(--t);
+            pointer-events: none;
+        }
+        /* Glossy sheen across the tile face */
+        .tile::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 42%;
+            background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+            pointer-events: none;
+        }
+
+        .tile:hover,
+        .tile:focus-visible {
+            transform: translateY(-8px) scale(1.04);
+            outline: none;
+            box-shadow:
+                inset 0 0 0 2px var(--menu-line),
+                inset 0 -4px 0 rgba(0, 0, 0, .08),
+                0 12px 0 rgba(0, 0, 0, .35),
+                0 24px 36px -8px var(--menu-shadow),
+                0 0 0 3px color-mix(in srgb, var(--a) 70%, transparent),
+                0 0 48px -4px color-mix(in srgb, var(--a) 70%, transparent);
+        }
+        .tile:hover::before,
+        .tile:focus-visible::before { opacity: .5; top: -28%; }
+        .tile:active {
+            transform: translateY(2px) scale(.98);
+            transition-duration: 90ms;
+            box-shadow:
+                inset 0 0 0 2px var(--menu-line),
+                inset 0 -2px 0 rgba(0, 0, 0, .08),
+                0 2px 0 rgba(0, 0, 0, .35),
+                0 6px 16px -6px var(--menu-shadow);
+        }
+
+        .tile-icon {
+            width: 88px;
+            height: 88px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            background: linear-gradient(145deg, var(--a), var(--b));
+            box-shadow:
+                inset 0 2px 0 rgba(255,255,255,.4),
+                inset 0 -3px 0 rgba(0,0,0,.25),
+                0 8px 16px -4px color-mix(in srgb, var(--a) 60%, transparent);
+            font-size: 44px;
+            margin-top: auto;
+            position: relative;
+            z-index: 1;
+            transition: transform var(--t-spring);
+        }
+        .tile:hover .tile-icon,
+        .tile:focus-visible .tile-icon {
+            transform: scale(1.08) rotate(-4deg);
+        }
+
+        .tile-name {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 24px;
+            font-weight: 400;
+            line-height: 1;
+            letter-spacing: -0.01em;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .tile-sub {
+            font-family: 'VT323', monospace;
+            font-size: 15px;
+            color: var(--tile-ink-dim);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Per-tile tints */
+        .tile-scribbl { --a: var(--tile-scribbl-a); --b: var(--tile-scribbl-b); }
+        .tile-booth   { --a: var(--tile-booth-a);   --b: var(--tile-booth-b); }
+
+        /* ---------- Bottom hint bar ---------- */
+        .hint-bar {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 8px 0 2px;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            color: var(--menu-ink-dim);
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(157, 242, 138, .25);
+            animation: fade-in .6s ease-out 900ms both;
+        }
+        .hint-bar .glyph {
+            color: var(--menu-accent);
+            animation: wiggle 2.4s ease-in-out infinite;
+            display: inline-block;
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---------- Reduce motion ---------- */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ---------- Mobile tweaks ---------- */
+        @media (max-width: 520px) {
+            body { padding: 12px; }
+            .device { padding: 10px; border-radius: 20px; }
+            .screen { padding: 20px 14px; }
+            .brand { font-size: 46px; }
+            .subtitle { font-size: 26px; letter-spacing: 0.1em; }
+            .subtitle .bat { font-size: 20px; margin: 0 8px; }
+            .tiles { gap: 14px; }
+            .tile { aspect-ratio: 1 / 1.1; padding: 16px 10px 14px; }
+            .tile-icon { width: 72px; height: 72px; font-size: 36px; }
+            .tile-name { font-size: 20px; }
+            .haunt-web { font-size: 60px; }
+            .haunt-ghost { font-size: 32px; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Animated background -->
-    <div class="bg-grid"></div>
-    <div class="bg-glow"></div>
+    <div class="device">
+        <span class="screw-l"></span>
+        <span class="screw-r"></span>
 
-    <!-- =============== LANDING SCREEN =============== -->
-    <section id="screen-landing" class="screen active">
-        <div class="landing-content">
-            <h1 class="logo">
-                <span class="logo-air">Air</span><span class="logo-sketch">Sketch</span>
-            </h1>
-            <p class="tagline">Draw in the air with your finger.<br/>Guess the doodle before time runs out.</p>
+        <div class="screen">
+            <!-- Starfield + scanlines handled by .screen::before / ::after -->
 
-            <div class="card setup-card">
-                <h2>Players</h2>
-                <p class="hint">Enter 2–6 names, one per line. Pass-and-play on one screen.</p>
-                <textarea id="player-input" rows="4" placeholder="Alice&#10;Bob&#10;Charlie"></textarea>
-
-                <div class="options-row">
-                    <label>
-                        Match format
-                        <select id="format-select">
-                            <option value="bo3" selected>Best of 3 — first to 2 wins</option>
-                            <option value="bo5">Best of 5 — first to 3 wins</option>
-                            <option value="bo7">Best of 7 — first to 4 wins</option>
-                            <option value="classic">Classic — fixed rounds</option>
-                        </select>
-                    </label>
-                    <label>
-                        Rounds per player <span class="hint-inline" id="rounds-hint">(classic only)</span>
-                        <select id="rounds-select">
-                            <option value="1">1</option>
-                            <option value="2" selected>2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                        </select>
-                    </label>
-                    <label>
-                        Seconds per round
-                        <select id="time-select">
-                            <option value="45">45s</option>
-                            <option value="60" selected>60s</option>
-                            <option value="90">90s</option>
-                            <option value="120">120s</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="options-row">
-                    <label>
-                        Difficulty
-                        <select id="difficulty-select">
-                            <option value="easy">Easy</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="hard">Hard</option>
-                        </select>
-                    </label>
-                    <label>
-                        Guesses per round
-                        <select id="attempts-select">
-                            <option value="3">3 attempts</option>
-                            <option value="5" selected>5 attempts</option>
-                            <option value="8">8 attempts</option>
-                            <option value="99">Unlimited</option>
-                        </select>
-                    </label>
-                    <div></div>
-                </div>
-
-                <label class="full-row-label">
-                    Input mode
-                    <select id="input-mode-select">
-                        <option value="keyboard" selected>Keyboard (recommended) — hand = cursor, SPACE to draw</option>
-                        <option value="gesture">Hand gestures — pose determines action</option>
-                    </select>
-                </label>
-                <label class="full-row-label">
-                    Performance
-                    <select id="perf-select">
-                        <option value="fast" selected>Fast (lite model, low lag)</option>
-                        <option value="accurate">Accurate (heavier, more precise)</option>
-                    </select>
-                </label>
-
-                <button id="btn-start" class="btn btn-primary">Start Game</button>
-                <button id="btn-practice" class="btn btn-ghost">Solo Practice Mode</button>
+            <!-- Floating spooky decorations -->
+            <div class="haunts" aria-hidden="true">
+                <span class="haunt haunt-web">🕸️</span>
+                <span class="haunt haunt-pumpkin-1">🎃</span>
+                <span class="haunt haunt-ghost">👻</span>
+                <span class="haunt haunt-bat-1">🦇</span>
+                <span class="haunt haunt-bat-2">🦇</span>
+                <span class="haunt haunt-pumpkin-2">🎃</span>
             </div>
 
-            <div class="controls-legend">
-                <h3>Keyboard Controls <span class="legend-recommended">Recommended</span></h3>
-                <div class="legend-grid">
-                    <div class="legend-item"><span class="key-cap">Space</span><div><strong>Pen down / up</strong><em>Tap to toggle drawing</em></div></div>
-                    <div class="legend-item"><span class="key-cap">E</span><div><strong>Eraser mode</strong><em>Tap to toggle</em></div></div>
-                    <div class="legend-item"><span class="key-cap">C</span><div><strong>Next color</strong></div></div>
-                    <div class="legend-item"><span class="key-cap">Z</span><div><strong>Undo</strong><em>Last stroke</em></div></div>
-                    <div class="legend-item"><span class="key-cap">1-6</span><div><strong>Pick color</strong></div></div>
+            <!-- Top status bar -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span>PROJECT CAM v1.0</span>
                 </div>
+                <div class="status-right">
+                    <span id="clock">--:--</span>
+                    <span>·</span>
+                    <span id="date">—</span>
+                </div>
+            </div>
 
-                <h3 style="margin-top: 24px;">Hand Gestures <span class="legend-optional">(gesture mode only)</span></h3>
-                <div class="legend-grid">
-                    <div class="legend-item"><span class="gesture-icon">☝️</span><div><strong>Index up</strong><em>Draw</em></div></div>
-                    <div class="legend-item"><span class="gesture-icon">🖐️</span><div><strong>Open palm</strong><em>Hover</em></div></div>
-                    <div class="legend-item"><span class="gesture-icon">✊</span><div><strong>Fist</strong><em>Erase (held firm)</em></div></div>
-                    <div class="legend-item"><span class="gesture-icon">✌️</span><div><strong>Peace</strong><em>Next color</em></div></div>
-                </div>
-                <p class="legend-note">
-                    💡 <strong>Best setup:</strong> sit <strong>arm's length</strong> from the camera (≈ 50–80 cm),
-                    good lighting on your hand. In <em>Keyboard mode</em> (recommended) your finger just moves the cursor —
-                    tap <strong>Space</strong> when you're ready to actually draw. No accidental marks!
+            <!-- Brand block -->
+            <header class="brand-block">
+                <h1 class="brand">
+                    Project<span class="brand-dot" aria-hidden="true"></span>Cam
+                </h1>
+                <p class="subtitle">
+                    <span class="bat" aria-hidden="true">🦇</span>Main Menu<span class="bat right" aria-hidden="true">🦇</span>
                 </p>
+            </header>
+
+            <!-- Tile grid -->
+            <nav class="tiles" aria-label="Game modes">
+                <a class="tile tile-scribbl" href="scribblcam.html">
+                    <div class="tile-icon" aria-hidden="true">✍️</div>
+                    <div class="tile-name">ScribblCam</div>
+                    <div class="tile-sub">Draw · Guess · Win</div>
+                </a>
+
+                <a class="tile tile-booth" href="photobooth/index.html">
+                    <div class="tile-icon" aria-hidden="true">📸</div>
+                    <div class="tile-name">Photo Booth</div>
+                    <div class="tile-sub">Hand Frames · Filters</div>
+                </a>
+            </nav>
+
+            <!-- Bottom hint bar -->
+            <div class="hint-bar">
+                <span class="glyph" aria-hidden="true">🎃</span>
+                <span>Pick a cart</span>
+                <span class="glyph" aria-hidden="true">🎃</span>
             </div>
         </div>
-    </section>
-
-    <!-- =============== HANDOFF SCREEN =============== -->
-    <section id="screen-handoff" class="screen">
-        <div class="handoff-content">
-            <p class="small-label">Next up to draw</p>
-            <h2 id="handoff-name" class="handoff-name">—</h2>
-            <p class="handoff-sub">Hand the device to this player.</p>
-            <p id="handoff-round-info" class="handoff-round-info"></p>
-            <button id="btn-handoff-ready" class="btn btn-primary">I'm Ready</button>
-        </div>
-    </section>
-
-    <!-- =============== PROMPT REVEAL SCREEN =============== -->
-    <section id="screen-prompt" class="screen">
-        <div class="prompt-content">
-            <p class="small-label">Your secret word</p>
-            <h2 id="prompt-word" class="prompt-word">—</h2>
-            <p class="prompt-hint">Only you can see this.<br/>Draw it with your index finger. No talking!</p>
-
-            <!-- Live calibration helper (shows after camera starts) -->
-            <div id="calibration-box" class="calibration-box">
-                <div class="calibration-header">
-                    <span class="small-label">Camera calibration</span>
-                    <span class="calibration-status" id="calibration-status">Starting camera…</span>
-                </div>
-                <div class="calibration-meter">
-                    <div class="meter-track">
-                        <span class="meter-zone meter-zone-good"></span>
-                        <div class="meter-indicator" id="meter-indicator"></div>
-                    </div>
-                    <div class="meter-labels"><span>Too far</span><span>Just right</span><span>Too close</span></div>
-                </div>
-                <ul class="calibration-tips">
-                    <li>Sit roughly <strong>50–80 cm</strong> (an arm's length) from the camera.</li>
-                    <li>Keep your <strong>drawing hand in frame</strong> — other movements won't be tracked.</li>
-                    <li>Hold just your <strong>index finger up ☝️</strong> to draw. Keep your other fingers curled.</li>
-                    <li>Need bright, even light on your hand — no strong backlight.</li>
-                </ul>
-            </div>
-
-            <button id="btn-prompt-start" class="btn btn-primary" disabled>Start Drawing</button>
-            <button id="btn-prompt-skip" class="btn btn-ghost">Skip this word</button>
-        </div>
-    </section>
-
-    <!-- =============== GAME SCREEN =============== -->
-    <section id="screen-game" class="screen">
-        <header class="game-header">
-            <div class="header-left">
-                <div class="drawer-label">
-                    <span class="small-label">Drawing</span>
-                    <span id="current-drawer">—</span>
-                </div>
-            </div>
-            <div class="header-center">
-                <div class="timer-wrapper">
-                    <div class="timer-ring">
-                        <svg viewBox="0 0 100 100">
-                            <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
-                            <circle id="timer-fg" class="timer-fg" cx="50" cy="50" r="45"></circle>
-                        </svg>
-                        <span id="timer-text">60</span>
-                    </div>
-                </div>
-            </div>
-            <div class="header-right">
-                <button id="btn-undo" class="btn btn-ghost btn-small" title="Undo (Z)">↶ Undo</button>
-                <button id="btn-clear" class="btn btn-ghost btn-small" title="Clear canvas">Clear</button>
-                <button id="btn-skip-round" class="btn btn-ghost btn-small">Skip</button>
-            </div>
-        </header>
-
-        <!-- Scoreboard strip (round wins per player, best-of-N format) -->
-        <div class="scoreboard-strip" id="scoreboard-strip">
-            <span class="scoreboard-label" id="scoreboard-label">Best of 3</span>
-            <div class="scoreboard-players" id="scoreboard-players"></div>
-        </div>
-
-        <main class="game-main">
-            <div class="canvas-wrapper">
-                <canvas id="draw-canvas" width="1280" height="720"></canvas>
-                <canvas id="cursor-canvas" width="1280" height="720"></canvas>
-
-                <!-- Overlay for status pills -->
-                <div class="status-pills">
-                    <div class="pill pill-pen pen-up" id="pill-pen">✋ Pen UP · press Space</div>
-                    <div class="pill" id="pill-mode">— NO HAND</div>
-                    <div class="pill" id="pill-color"><span class="color-dot"></span>Red</div>
-                    <div class="pill pill-distance hidden" id="pill-distance"></div>
-                </div>
-
-                <!-- Hotkey hints bottom-left -->
-                <div class="hotkey-hints" id="hotkey-hints">
-                    <span><span class="key-cap">Space</span> draw</span>
-                    <span><span class="key-cap">E</span> erase</span>
-                    <span><span class="key-cap">C</span> color</span>
-                    <span><span class="key-cap">Z</span> undo</span>
-                </div>
-
-                <!-- Camera preview (small, bottom-left) -->
-                <div class="cam-preview">
-                    <video id="cam-video" autoplay playsinline muted></video>
-                    <canvas id="cam-overlay"></canvas>
-                    <div class="cam-status" id="cam-status">Waiting for camera…</div>
-                </div>
-            </div>
-
-            <!-- Color palette (visual indicator) -->
-            <div class="palette">
-                <div class="palette-swatch active" data-color="#ff3860" style="background:#ff3860"></div>
-                <div class="palette-swatch" data-color="#ffdd57" style="background:#ffdd57"></div>
-                <div class="palette-swatch" data-color="#48c774" style="background:#48c774"></div>
-                <div class="palette-swatch" data-color="#3298dc" style="background:#3298dc"></div>
-                <div class="palette-swatch" data-color="#b86bff" style="background:#b86bff"></div>
-                <div class="palette-swatch" data-color="#ffffff" style="background:#ffffff"></div>
-            </div>
-        </main>
-
-        <footer class="game-footer">
-            <div class="guess-row">
-                <select id="guess-player" class="guess-select"></select>
-                <input id="guess-input" type="text" placeholder="Type a guess…" autocomplete="off" />
-                <div class="hearts" id="hearts"></div>
-                <button id="btn-guess" class="btn btn-primary">Guess</button>
-            </div>
-            <div id="guess-feedback" class="guess-feedback"></div>
-        </footer>
-    </section>
-
-    <!-- =============== ROUND END SCREEN =============== -->
-    <section id="screen-round-end" class="screen">
-        <div class="round-end-content">
-            <p id="round-end-result" class="small-label">Round over!</p>
-            <h2 id="round-end-word" class="prompt-word">—</h2>
-            <div id="round-end-points" class="round-end-points"></div>
-            <div class="scoreboard-mini" id="scoreboard-mini"></div>
-            <button id="btn-next-round" class="btn btn-primary">Next Round</button>
-        </div>
-    </section>
-
-    <!-- =============== GAME OVER SCREEN =============== -->
-    <section id="screen-gameover" class="screen">
-        <div class="gameover-content">
-            <h1 class="gameover-title">🏆 Final Scores</h1>
-            <ol id="final-scores" class="final-scores"></ol>
-            <button id="btn-play-again" class="btn btn-primary">Play Again</button>
-            <button id="btn-home" class="btn btn-ghost">Back to Home</button>
-        </div>
-    </section>
-
-    <!-- Confetti layer -->
-    <canvas id="confetti-canvas"></canvas>
-
-    <!-- Bleeding overlay — intensifies as guess attempts run out -->
-    <div class="bleed-overlay" id="bleed-overlay" aria-hidden="true">
-        <div class="bleed-vignette"></div>
-        <div class="bleed-drips">
-            <span></span><span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span><span></span>
-        </div>
-        <div class="bleed-flash"></div>
     </div>
 
-    <!-- Loading overlay -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="spinner"></div>
-        <p id="loading-text">Loading hand tracking…</p>
-    </div>
+    <script>
+        // ---------- Live clock (vintage DS vibe) ----------
+        (function clock() {
+            const clockEl = document.getElementById('clock');
+            const dateEl  = document.getElementById('date');
+            const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+            function tick() {
+                const d = new Date();
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                clockEl.textContent = `${hh}:${mm}`;
+                dateEl.textContent  = `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}`;
+            }
+            tick();
+            setInterval(tick, 15_000);
+        })();
 
-    <!-- MediaPipe Hands via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
-    <script src="game.js"></script>
+        // ---------- Arrow-key tile selection (DS feel, still works silently) ----------
+        (function keyboardNav() {
+            const tiles = [...document.querySelectorAll('.tile:not(.locked)')];
+            if (!tiles.length) return;
+            let i = 0;
+            // Focus the first tile after the pop-in animation settles.
+            setTimeout(() => tiles[i].focus(), 900);
+            document.addEventListener('keydown', e => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    i = (i + 1) % tiles.length;
+                    tiles[i].focus();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    i = (i - 1 + tiles.length) % tiles.length;
+                    tiles[i].focus();
+                } else if (e.key === 'Enter') {
+                    const active = document.activeElement;
+                    if (active && active.classList.contains('tile')) active.click();
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

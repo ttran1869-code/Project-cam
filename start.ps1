@@ -1,5 +1,5 @@
-# AirSketch launcher
-# Starts a local HTTP server and opens the game in your default browser.
+# Project Cam launcher
+# Starts a local HTTP server and opens the main menu in your default browser.
 
 $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
@@ -39,5 +39,5 @@ Start-Sleep -Milliseconds 1200
 Write-Host "Opening $url ..."
 Start-Process $url
 Write-Host ""
-Write-Host "AirSketch is running at $url"
+Write-Host "Project Cam is running at $url"
 Write-Host "Press Ctrl+C in the server window to stop."

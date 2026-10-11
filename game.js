@@ -1,5 +1,5 @@
 /* =============================================================
- * AirSketch — Camera-based drawing game
+ * ScribblCam — Camera-based drawing game
  * Hand tracking: MediaPipe Hands
  * Drawing: Canvas 2D
  * ============================================================= */
@@ -32,20 +32,32 @@
     };
 
     // ---------- State ----------
+    //
+    // Team mode (the real game):
+    //   State.teams[]       = [{ name, color, members: [names], score, turnsPlayed }]
+    //   State.currentTeamIdx = whose turn it is right now
+    //   Within a team, roles rotate every time that team plays:
+    //       drawer  = members[turnsPlayed       % N]
+    //       guesser = members[(turnsPlayed + 1) % N]
+    //   So in a team of 2, the pair swaps roles each turn. In a team of 3+,
+    //   roles rotate through the whole roster.
+    //
+    // Scoring: team gets points based on how much time was LEFT when the
+    // guesser nailed it. Faster = more points. Timeout = 0.
+    //   points = max(10, round(10 + 90 * timeLeftRatio))     // 10..100 pts
+    //
+    // Practice (solo) mode just keeps State.players=['You'] and skips teams.
     const State = {
-        players: [],
-        scores: {},             // cumulative points
-        roundWins: {},          // per-player count of rounds won (BO-N tracking)
-        roundsPerPlayer: 2,
+        players: [],            // flat list of all players (across teams)
+        teams: [],              // see shape above
+        currentTeamIdx: 0,
+        roundsPerTeam: 2,
         secondsPerRound: 60,
         difficulty: 'medium',
         inputMode: 'keyboard',  // 'keyboard' | 'gesture'
         perfMode: 'fast',       // 'fast' | 'accurate'
-        format: 'bo3',          // 'bo3' | 'bo5' | 'bo7' | 'classic'
-        winTarget: 2,           // first-to-N wins (derived from format)
         maxAttempts: 5,
         attemptsLeft: 5,
-        currentDrawerIdx: 0,
         currentRound: 0,
         totalRounds: 0,
         currentWord: '',
@@ -57,11 +69,79 @@
         isPractice: false
     };
 
-    function winTargetFor(format) {
-        if (format === 'bo3') return 2;
-        if (format === 'bo5') return 3;
-        if (format === 'bo7') return 4;
-        return Infinity; // classic — no target
+    // Palette for team pills / scoreboard tints. Picked for high contrast + cozy feel.
+    const TEAM_COLORS = ['#ff6b6b', '#4ecdc4', '#ffd93d', '#95e1d3', '#c084fc', '#ff9f1c'];
+
+    // ---------- Team helpers ----------
+    function currentTeam()      { return State.teams[State.currentTeamIdx]; }
+    function teamDrawer(t)      { return t.members[t.turnsPlayed % t.members.length]; }
+    function teamGuesser(t)     { return t.members[(t.turnsPlayed + 1) % t.members.length]; }
+    function currentDrawer()    { return State.isPractice ? 'You' : teamDrawer(currentTeam()); }
+    function currentGuesser()   { return State.isPractice ? 'You' : teamGuesser(currentTeam()); }
+
+    // Points = linear reward on remaining time. 10 pts floor, 100 pts for an instant guess.
+    function computePoints(timeLeft, totalTime) {
+        if (timeLeft <= 0) return 0;
+        const ratio = Math.max(0, Math.min(1, timeLeft / totalTime));
+        return Math.max(10, Math.round(10 + 90 * ratio));
+    }
+
+    // Parse the setup-screen textarea into teams.
+    // Accepts either:
+    //     Alice, Bob
+    //     Charlie, Dave
+    // or named teams:
+    //     Dragons: Alice, Bob
+    //     Wolves: Charlie, Dave
+    // Lines starting with "#" are treated as comments and ignored.
+    function parseTeams(text) {
+        const lines = String(text || '')
+            .split('\n')
+            .map(l => l.trim())
+            .filter(Boolean)
+            .filter(l => !l.startsWith('#'));
+        const teams = [];
+        const seen = new Set();  // dedup across the whole roster
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let name, membersStr;
+            const colon = line.indexOf(':');
+            if (colon > 0) {
+                name = line.substring(0, colon).trim() || `Team ${i + 1}`;
+                membersStr = line.substring(colon + 1);
+            } else {
+                name = `Team ${i + 1}`;
+                membersStr = line;
+            }
+            const members = [];
+            for (const raw of membersStr.split(',')) {
+                const m = raw.trim();
+                if (!m) continue;
+                const low = m.toLowerCase();
+                if (seen.has(low)) continue;    // skip duplicate names across teams
+                seen.add(low);
+                members.push(m);
+            }
+            if (members.length === 0) continue; // skip empty / all-dup lines
+            teams.push({
+                name,
+                color: TEAM_COLORS[i % TEAM_COLORS.length],
+                members,
+                score: 0,
+                turnsPlayed: 0
+            });
+        }
+        return teams;
+    }
+
+    function validateTeams(teams) {
+        if (teams.length < 2) return 'Need at least 2 teams (one per line).';
+        for (const t of teams) {
+            if (t.members.length < 2) return `${t.name} needs at least 2 members (1 drawer, 1 guesser).`;
+        }
+        const total = teams.reduce((s, t) => s + t.members.length, 0);
+        if (total < 4) return 'Need at least 4 players total.';
+        return null;
     }
 
     // ---------- Input state (keyboard-controlled pen) ----------
@@ -1112,48 +1192,24 @@
     }
 
     function startGame() {
-        const names = el('player-input').value
-            .split('\n')
-            .map(n => n.trim())
-            .filter(Boolean);
-
-        if (names.length < 2) {
-            el('player-input').style.borderColor = 'var(--danger)';
-            el('player-input').placeholder = 'Need at least 2 players!';
-            el('player-input').value = '';
-            setTimeout(() => { el('player-input').style.borderColor = ''; }, 1500);
+        const teams = parseTeams(el('player-input').value);
+        const err = validateTeams(teams);
+        if (err) {
+            showInputError(err);
             return;
         }
-        if (names.length > 6) {
-            alert('Max 6 players.');
-            return;
-        }
-        // Dedup
-        const seen = new Set();
-        State.players = [];
-        for (const n of names) {
-            if (!seen.has(n.toLowerCase())) {
-                seen.add(n.toLowerCase());
-                State.players.push(n);
-            }
-        }
 
-        State.scores = {};
-        State.roundWins = {};
-        State.players.forEach(p => { State.scores[p] = 0; State.roundWins[p] = 0; });
-        State.roundsPerPlayer = parseInt(el('rounds-select').value, 10);
+        State.teams = teams;
+        State.players = teams.flatMap(t => t.members);   // flat list for anything that needs it
+        State.currentTeamIdx = 0;
+        State.currentRound = 0;
+        State.roundsPerTeam = parseInt(el('rounds-select').value, 10);
+        State.totalRounds = State.roundsPerTeam * State.teams.length;
         State.secondsPerRound = parseInt(el('time-select').value, 10);
         State.difficulty = el('difficulty-select').value;
         State.inputMode = el('input-mode-select').value;
         State.perfMode = el('perf-select').value;
-        State.format = el('format-select').value;
-        State.winTarget = winTargetFor(State.format);
         State.maxAttempts = parseInt(el('attempts-select').value, 10);
-        State.totalRounds = (State.format === 'classic')
-            ? State.roundsPerPlayer * State.players.length
-            : Infinity; // BO ends when someone hits winTarget
-        State.currentRound = 0;
-        State.currentDrawerIdx = 0;
         State.usedWords = new Set();
         State.isPractice = false;
 
@@ -1161,21 +1217,34 @@
         beginRound();
     }
 
+    // Show a validation error under the teams textarea without clobbering what the user typed.
+    function showInputError(msg) {
+        const errEl = el('player-input-error');
+        const input = el('player-input');
+        if (errEl) {
+            errEl.textContent = msg;
+            errEl.classList.add('visible');
+        }
+        input.style.borderColor = 'var(--danger)';
+        clearTimeout(showInputError._to);
+        showInputError._to = setTimeout(() => {
+            if (errEl) errEl.classList.remove('visible');
+            input.style.borderColor = '';
+        }, 3500);
+    }
+
     function startPractice() {
+        State.teams = [];
         State.players = ['You'];
-        State.scores = { You: 0 };
-        State.roundWins = { You: 0 };
-        State.roundsPerPlayer = 999;
+        State.currentTeamIdx = 0;
+        State.roundsPerTeam = 999;
         State.secondsPerRound = parseInt(el('time-select').value, 10);
         State.difficulty = el('difficulty-select').value;
         State.inputMode = el('input-mode-select').value;
         State.perfMode = el('perf-select').value;
-        State.format = 'classic';
-        State.winTarget = Infinity;
         State.maxAttempts = 99;  // no attempts limit in solo
         State.totalRounds = 999;
         State.currentRound = 0;
-        State.currentDrawerIdx = 0;
         State.usedWords = new Set();
         State.isPractice = true;
         audio.click();
@@ -1187,14 +1256,23 @@
         State.pendingCorrect = false;
         if (State.isPractice) {
             showPromptReveal();
-        } else {
-            // Handoff screen
-            const drawer = State.players[State.currentDrawerIdx];
-            el('handoff-name').textContent = drawer;
-            el('handoff-round-info').textContent =
-                `Round ${State.currentRound + 1} of ${State.totalRounds} · ${State.secondsPerRound}s · ${capitalize(State.difficulty)}`;
-            showScreen('handoff');
+            return;
         }
+        // Team handoff screen — surface which team is up, who's drawing, and who's guessing.
+        const team = currentTeam();
+        const drawer = teamDrawer(team);
+        const guesser = teamGuesser(team);
+        const nameEl = el('handoff-team-name');
+        if (nameEl) {
+            nameEl.textContent = team.name;
+            nameEl.style.setProperty('--team-color', team.color);
+        }
+        el('handoff-name').textContent = drawer;
+        const guesserEl = el('handoff-guesser');
+        if (guesserEl) guesserEl.textContent = guesser;
+        el('handoff-round-info').textContent =
+            `Round ${State.currentRound + 1} of ${State.totalRounds} · ${State.secondsPerRound}s · ${capitalize(State.difficulty)}`;
+        showScreen('handoff');
     }
 
     function showPromptReveal() {
@@ -1273,8 +1351,19 @@
         stopCalibration();
 
         // Setup UI
-        el('current-drawer').textContent = State.isPractice ? 'Practice' : State.players[State.currentDrawerIdx];
-        populateGuessSelect();
+        el('current-drawer').textContent = State.isPractice ? 'Practice' : currentDrawer();
+        const teamChip = el('current-team');
+        if (teamChip) {
+            if (State.isPractice) {
+                teamChip.hidden = true;
+            } else {
+                const t = currentTeam();
+                teamChip.hidden = false;
+                teamChip.textContent = t.name;
+                teamChip.style.setProperty('--team-color', t.color);
+            }
+        }
+        setGuesserLabel();
         el('guess-input').value = '';
         el('guess-feedback').textContent = '';
         el('guess-feedback').className = 'guess-feedback';
@@ -1350,25 +1439,12 @@
         else if (left <= 20) fg.classList.add('warn');
     }
 
-    function populateGuessSelect() {
-        const sel = el('guess-player');
-        sel.innerHTML = '';
-        if (State.isPractice) {
-            const o = document.createElement('option');
-            o.value = 'You';
-            o.textContent = 'You';
-            sel.appendChild(o);
-            sel.style.display = 'none';
-            return;
-        }
-        sel.style.display = '';
-        State.players.forEach((p, i) => {
-            if (i === State.currentDrawerIdx) return; // drawer can't guess
-            const o = document.createElement('option');
-            o.value = p;
-            o.textContent = p;
-            sel.appendChild(o);
-        });
+    function setGuesserLabel() {
+        const nameEl = el('guesser-name');
+        const wrap = el('guess-guesser');
+        if (!nameEl) return;
+        nameEl.textContent = currentGuesser();
+        if (wrap) wrap.hidden = false;
     }
 
     function submitGuess() {
@@ -1378,7 +1454,7 @@
         if (State.attemptsLeft <= 0) return;
 
         const target = State.currentWord.toLowerCase();
-        const guesser = el('guess-player').value || 'You';
+        const guesser = currentGuesser();
 
         if (fuzzyMatch(guess, target)) {
             endRound(true, guesser);
@@ -1507,7 +1583,7 @@
     }
 
     // =============================================================
-    // Scoreboard strip (per-round wins, Best-of-N tracker)
+    // Scoreboard strip (team points)
     // =============================================================
     function renderScoreboard() {
         const strip = el('scoreboard-strip');
@@ -1520,40 +1596,21 @@
             return;
         }
         strip.style.display = '';
+        label.textContent = `Team race · ${State.totalRounds} rounds`;
 
-        const formatText = {
-            bo3: 'Best of 3 · First to 2',
-            bo5: 'Best of 5 · First to 3',
-            bo7: 'Best of 7 · First to 4',
-            classic: `Classic · ${State.totalRounds} rounds`
-        };
-        label.textContent = formatText[State.format] || '';
+        const leaderScore = Math.max(0, ...State.teams.map(t => t.score));
+        const up = currentTeam();
 
-        const target = State.winTarget === Infinity ? 0 : State.winTarget;
-        const drawer = State.players[State.currentDrawerIdx];
-        const leaderWins = Math.max(0, ...State.players.map(p => State.roundWins[p] || 0));
-
-        list.innerHTML = State.players.map(p => {
-            const wins = State.roundWins[p] || 0;
-            const isDrawer = p === drawer;
-            const isLeader = wins > 0 && wins === leaderWins;
-            // Build "pip" dots for BO formats, numeric for classic
-            let winsHtml;
-            if (target > 0 && target <= 5) {
-                let pips = '';
-                for (let i = 0; i < target; i++) {
-                    pips += `<span class="pip ${i < wins ? 'on' : ''}"></span>`;
-                }
-                winsHtml = `<span class="score-chip-wins">${pips}</span>`;
-            } else {
-                winsHtml = `<span class="score-chip-wins">${wins}W</span>`;
-            }
+        list.innerHTML = State.teams.map(t => {
+            const isUp = t === up;
+            const isLeader = t.score > 0 && t.score === leaderScore;
             const cls = ['score-chip'];
-            if (isDrawer) cls.push('drawer');
-            if (isLeader && !isDrawer) cls.push('winner');
-            return `<div class="${cls.join(' ')}">
-                <span class="score-chip-name">${escapeHtml(p)}${isDrawer ? ' ✍️' : ''}</span>
-                ${winsHtml}
+            if (isUp) cls.push('drawer');
+            if (isLeader && !isUp) cls.push('winner');
+            return `<div class="${cls.join(' ')}" style="--team-color:${t.color}">
+                <span class="score-chip-dot" aria-hidden="true"></span>
+                <span class="score-chip-name">${escapeHtml(t.name)}${isUp ? ' ✍️' : ''}</span>
+                <span class="score-chip-wins">${t.score} pts</span>
             </div>`;
         }).join('');
     }
@@ -1588,21 +1645,16 @@
         clearInterval(State.timerInterval);
         clearBleed();
 
-        const timeTaken = State.secondsPerRound - State.timeLeft;
+        const timeTaken = Math.max(0, State.secondsPerRound - State.timeLeft);
+        const leftoverPct = Math.round(Math.max(0, State.timeLeft / State.secondsPerRound) * 100);
         const outOfAttempts = (State.attemptsLeft <= 0 && State.maxAttempts < 99);
-        let drawerPts = 0, guesserPts = 0;
+        let teamPts = 0;
 
         if (correct && !State.isPractice) {
-            // Reward: faster = more points
-            const timeRatio = Math.max(0, State.timeLeft / State.secondsPerRound);
-            guesserPts = Math.round(50 + timeRatio * 50);
-            drawerPts = Math.round(30 + timeRatio * 40);
-            State.scores[guesser] = (State.scores[guesser] || 0) + guesserPts;
-            const drawer = State.players[State.currentDrawerIdx];
-            State.scores[drawer] = (State.scores[drawer] || 0) + drawerPts;
-            // Round-win credit for BO tracking: both the guesser and the drawer get +1
-            State.roundWins[guesser]  = (State.roundWins[guesser]  || 0) + 1;
-            State.roundWins[drawer]   = (State.roundWins[drawer]   || 0) + 1;
+            // Faster guess = more leftover time = more points.
+            // Using 80–90% of the clock leaves little leftover, so the payout drops hard.
+            teamPts = computePoints(State.timeLeft, State.secondsPerRound);
+            currentTeam().score += teamPts;
             audio.correct();
             Confetti.fire(window.innerWidth / 2, window.innerHeight / 3);
         } else if (correct && State.isPractice) {
@@ -1612,7 +1664,6 @@
             audio.wrong();
         }
 
-        // Fill round-end screen
         let resultText;
         if (correct)             resultText = '✓ Correct!';
         else if (outOfAttempts)  resultText = '💀 Out of attempts!';
@@ -1622,12 +1673,13 @@
 
         let pointsHtml = '';
         if (correct && !State.isPractice) {
+            const team = currentTeam();
             pointsHtml = `
-                <div><strong>${escapeHtml(guesser)}</strong> guessed in <strong>${timeTaken}s</strong> · <strong>+${guesserPts}</strong> pts · <strong>+1 round win</strong></div>
-                <div>Drawer <strong>${escapeHtml(State.players[State.currentDrawerIdx])}</strong> · <strong>+${drawerPts}</strong> pts · <strong>+1 round win</strong></div>
+                <div><strong>${escapeHtml(guesser)}</strong> guessed in <strong>${timeTaken}s</strong> · <strong>${leftoverPct}%</strong> of the clock left</div>
+                <div><strong>${escapeHtml(team.name)}</strong> · drawer <strong>${escapeHtml(currentDrawer())}</strong> · <strong>+${teamPts}</strong> pts</div>
             `;
         } else if (!State.isPractice) {
-            pointsHtml = `<div>No one guessed it. No round win awarded.</div>`;
+            pointsHtml = `<div>No guess this round. <strong>${escapeHtml(currentTeam().name)}</strong> scores 0.</div>`;
         }
         el('round-end-points').innerHTML = pointsHtml;
 
@@ -1640,41 +1692,30 @@
             el('scoreboard-mini').innerHTML = '';
             return;
         }
-        const sorted = [...State.players].sort((a, b) => {
-            // Primary: round wins; Secondary: points
-            if ((State.roundWins[b] || 0) !== (State.roundWins[a] || 0))
-                return (State.roundWins[b] || 0) - (State.roundWins[a] || 0);
-            return (State.scores[b] || 0) - (State.scores[a] || 0);
-        });
-        const topWins = sorted.length ? (State.roundWins[sorted[0]] || 0) : 0;
-        el('scoreboard-mini').innerHTML = sorted.map(p => {
-            const wins = State.roundWins[p] || 0;
-            const pts = State.scores[p] || 0;
-            const isLeader = wins > 0 && wins === topWins;
-            return `
-                <div class="score-row ${isLeader ? 'leader' : ''}">
-                    <span class="score-row-name">${escapeHtml(p)}</span>
-                    <span class="score-row-score">${wins}W · ${pts} pts</span>
-                </div>
-            `;
-        }).join('');
+        const sorted = [...State.teams].sort((a, b) => b.score - a.score);
+        const top = sorted.length ? sorted[0].score : 0;
+        el('scoreboard-mini').innerHTML = sorted.map(t => `
+            <div class="score-row ${t.score > 0 && t.score === top ? 'leader' : ''}">
+                <span class="score-row-name">
+                    <span class="score-chip-dot" style="--team-color:${t.color}"></span>
+                    ${escapeHtml(t.name)}
+                    <em class="score-row-members">${t.members.map(escapeHtml).join(' · ')}</em>
+                </span>
+                <span class="score-row-score">${t.score} pts</span>
+            </div>
+        `).join('');
     }
 
     function nextRound() {
-        State.currentRound++;
         if (State.isPractice) {
             beginRound();
             return;
         }
-        // BO win-target check — did anyone just clinch it?
-        if (State.winTarget !== Infinity) {
-            const champion = State.players.find(p => (State.roundWins[p] || 0) >= State.winTarget);
-            if (champion) {
-                showGameOver();
-                return;
-            }
-        }
-        State.currentDrawerIdx = (State.currentDrawerIdx + 1) % State.players.length;
+        // This team just finished a turn — rotate their drawer/guesser pair next time they play.
+        const team = currentTeam();
+        if (team) team.turnsPlayed += 1;
+        State.currentRound += 1;
+        State.currentTeamIdx = (State.currentTeamIdx + 1) % State.teams.length;
         if (State.currentRound >= State.totalRounds) {
             showGameOver();
         } else {
@@ -1684,16 +1725,25 @@
 
     function showGameOver() {
         clearBleed();
-        const sorted = [...State.players].sort((a, b) => {
-            if ((State.roundWins[b] || 0) !== (State.roundWins[a] || 0))
-                return (State.roundWins[b] || 0) - (State.roundWins[a] || 0);
-            return (State.scores[b] || 0) - (State.scores[a] || 0);
-        });
+        const sorted = [...State.teams].sort((a, b) => b.score - a.score);
         const ol = el('final-scores');
-        ol.innerHTML = sorted.map((p, i) => `
+        const title = document.querySelector('.gameover-title');
+        if (title && sorted.length) {
+            const top = sorted[0];
+            const tied = sorted.filter(t => t.score === top.score);
+            title.textContent = tied.length > 1
+                ? '🤝 It\'s a tie'
+                : `🏆 ${top.name} wins`;
+        }
+        ol.innerHTML = sorted.map((t, i) => `
             <li class="${i === 0 ? 'winner' : ''}">
-                <span><span class="rank-num">#${i + 1}</span>${escapeHtml(p)}</span>
-                <span>${State.roundWins[p] || 0} wins · ${State.scores[p] || 0} pts</span>
+                <span>
+                    <span class="rank-num">#${i + 1}</span>
+                    <span class="score-chip-dot" style="--team-color:${t.color}"></span>
+                    ${escapeHtml(t.name)}
+                    <em class="score-row-members">${t.members.map(escapeHtml).join(' · ')}</em>
+                </span>
+                <span>${t.score} pts</span>
             </li>
         `).join('');
         showScreen('gameover');
@@ -1855,9 +1905,9 @@
     el('btn-next-round').addEventListener('click', () => { audio.click(); nextRound(); });
     el('btn-play-again').addEventListener('click', () => {
         audio.click();
-        State.players.forEach(p => { State.scores[p] = 0; State.roundWins[p] = 0; });
+        State.teams.forEach(t => { t.score = 0; t.turnsPlayed = 0; });
         State.currentRound = 0;
-        State.currentDrawerIdx = 0;
+        State.currentTeamIdx = 0;
         State.usedWords = new Set();
         clearBleed();
         beginRound();
@@ -1869,7 +1919,8 @@
         stopCalibration();
         clearBleed();
         Hand.stop();
-        showScreen('landing');
+        // Back to the mode-select hub (not the ScribblCam setup screen).
+        window.location.href = 'index.html';
     });
 
     // Resize handling
@@ -1880,7 +1931,7 @@
     });
 
     // Expose for debugging
-    window._AirSketch = { State, Hand, Draw };
+    window._ScribblCam = { State, Hand, Draw };
 
-    console.log('%cAirSketch%c ready. Draw in the air! ✍️', 'font-weight:900;color:#7c5cff', 'color:#9ea4c7');
+    console.log('%cScribblCam%c ready. Draw in the air! ✍️', 'font-weight:900;color:#7c5cff', 'color:#9ea4c7');
 })();

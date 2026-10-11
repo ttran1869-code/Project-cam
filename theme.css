@@ -1,0 +1,47 @@
+/* =========================================================
+   ScribblCam — Game Theme
+   ----------------------------------------------------------
+   Cozy atelier palette. Warm paper, terracotta, ochre, ink.
+   Edit these values to re-skin the game.
+   ========================================================= */
+
+:root {
+    /* --------- Background layers --------- */
+    --bg-0: #1a120e;         /* espresso room */
+    --bg-1: #2a1c16;         /* walnut panel */
+    --bg-2: #3b271c;         /* warmer wood */
+
+    /* --------- Surfaces (translucent, for glass) --------- */
+    --surface: rgba(255, 232, 204, 0.07);
+    --surface-strong: rgba(255, 232, 204, 0.12);
+    --border: rgba(244, 220, 186, 0.16);
+
+    /* --------- Text --------- */
+    --text: #f6ead4;         /* cream paper */
+    --text-dim: #c9ae8d;     /* tea-stained */
+
+    /* --------- Brand accents --------- */
+    --primary: #c45c26;                            /* terracotta */
+    --primary-glow: rgba(196, 92, 38, 0.45);
+    --primary-deep: #9a3f16;                       /* burnt sienna */
+    --accent: #e0a44a;                             /* ochre */
+    --accent-glow: rgba(224, 164, 74, 0.4);
+
+    /* --------- Semantic --------- */
+    --success: #7cb87a;
+    --danger: #d4544a;
+    --warning: #e0a44a;
+
+    /* --------- Shape --------- */
+    --radius: 16px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+
+    /* --------- Motion --------- */
+    --transition: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* --------- Display fonts (set on landing) --------- */
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-script: 'Caveat', 'Segoe Script', cursive;
+    --font-ui: 'Nunito', 'Segoe UI', sans-serif;
+}
