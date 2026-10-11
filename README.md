@@ -136,22 +136,22 @@ Camera access requires an `http://localhost` or `https://` origin — opening
 ### Option 1 — one-click launchers
 
 - Double-click **`start.ps1`** (PowerShell) or **`start.bat`** (CMD) in this folder.
-- Both will start a local server on port 8000 and open the Main Menu in your browser.
+- Both will start a local server on port 8766 and open the Main Menu in your browser.
 
 ### Option 2 — Python
 
 ```powershell
 cd C:\Users\tranq\scribblcam
-python -m http.server 8000
+python -m http.server 8766
 ```
 
-Then open **http://localhost:8000** in Chrome / Edge / Safari.
+Then open **http://localhost:8766** in Chrome / Edge / Safari.
 
 ### Option 3 — Node.js
 
 ```powershell
 cd C:\Users\tranq\scribblcam
-npx serve . -l 8000
+npx serve . -l 8766
 ```
 
 ## 🧑‍🤝‍🧑 Browser compatibility
